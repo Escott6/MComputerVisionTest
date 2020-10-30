@@ -8,12 +8,13 @@ from msrest.authentication import CognitiveServicesCredentials
 import time
 from re import search
 
+redactedLines = ["phrases to redact", "test phrase2", "Expo Marker", "lazy"]
 
+# Where you would actually replace the phrases in the lines of text with something else
 def check_redacted(line):
     for phrase in redactedLines:
         line.replace(phrase, "---")
-        
-    
+
     return line 
 
 

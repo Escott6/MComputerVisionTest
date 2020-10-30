@@ -37,16 +37,21 @@ def home(request):
         time.sleep(1)
 
     # Print the detected text, line by line
+    original_text = ""
+    new_text = ""
     if get_handw_text_results.status == OperationStatusCodes.succeeded:
         for text_result in get_handw_text_results.analyze_result.read_results:
             for line in text_result.lines:
-                print(str(type(line))+ '\n')
+                
                 var = line.text
+
                 print(var + '\n')
+                original_text += var + " "
                 for phrase in redactedLines:
-                    var = var.replace(phrase, "---")
+                    var = var.replace(phrase, "-"*len(phrase))
                 print(var)
+                new_text += var + " "
                 print(line.bounding_box)
     print()
 
-    return HttpResponse("Hello")
+    return HttpResponse("Original text: " + original_text + " \n New Text: " + new_text)
