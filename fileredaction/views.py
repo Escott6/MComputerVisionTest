@@ -12,11 +12,12 @@ from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
 from azure.cognitiveservices.vision.computervision.models import VisualFeatureTypes
 from msrest.authentication import CognitiveServicesCredentials
+from .models import Redactor
 
 
 subscription_key = 'e1bf09dca0de4192a2aceaff80e4f380'
 endpoint = 'https://stagingcomputervision.cognitiveservices.azure.com/'
-redactedLines = ["phrases to redact", "test phrase2", "Yukon", "lazy", "computer", "canada"]
+redactedLines = ["phrases to redact", "test phrase2", "Yukon", "lazy", "computer", "canada", "website"]
 
 
 class HomeView(View):
@@ -32,24 +33,11 @@ class HomeView(View):
 
 
 def pdf_view(request):
-    remote_pdf_url = "fileredaction/pdf-test.pdf"
-    doc = fitz.open(remote_pdf_url)
-    print(doc.FontInfos)
-    redacted_lines = '|'.join(redactedLines)
-    for page in doc:
-        page._wrapContents()
-        sensitive = check_redacted(page.getText("text").split('\n'), redacted_lines=redacted_lines) 
-        for data in sensitive: 
-            areas = page.searchFor(data) 
-                  
-                # drawing outline over sensitive datas 
-            [page.addRedactAnnot(area, fill = (0, 0, 0)) for area in areas] 
-            quads = page.searchFor("website", quads=True)
-            page.addRedactAnnot(quads)
-        # applying the redaction 
-        page.apply_redactions() 
-    doc.save('redacted.pdf')
+    path = "fileredaction/pdf-test.pdf"
+    redactor = Redactor(path)
+    redactor.redaction()
     return render(request, "pdf.html")
+
 
 def home(request):
     
