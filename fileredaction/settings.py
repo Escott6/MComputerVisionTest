@@ -114,6 +114,9 @@ USE_L10N = True
 
 USE_TZ = True
 
+M_VISION_ENDPOINT = 'https://stagingcomputervision.cognitiveservices.azure.com/'
+M_VISION_KEY = 'e1bf09dca0de4192a2aceaff80e4f380'
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/

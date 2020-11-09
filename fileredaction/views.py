@@ -15,8 +15,10 @@ from msrest.authentication import CognitiveServicesCredentials
 from .models import Redactor
 
 
-subscription_key = 'e1bf09dca0de4192a2aceaff80e4f380'
-endpoint = 'https://stagingcomputervision.cognitiveservices.azure.com/'
+from django.conf import settings
+
+M_VISION_KEY = getattr(settings, "M_VISION_KEY")
+M_VISION_ENDPOINT = getattr(settings,"M_VISION_ENDPOINT")
 redactedLines = ["phrases to redact", "test phrase2", "Yukon", "lazy", "computer", "canada", "website"]
 
 
@@ -41,7 +43,7 @@ def pdf_view(request):
 
 def home(request):
     
-    computervision_client = ComputerVisionClient(endpoint, CognitiveServicesCredentials(subscription_key))
+    computervision_client = ComputerVisionClient(M_VISION_ENDPOINT, CognitiveServicesCredentials(M_VISION_KEY))
     remote_image_handw_text_url = "https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/master/articles/cognitive-services/Computer-vision/Images/readsample.jpg"
     recognize_handw_results = computervision_client.read(remote_image_handw_text_url,  raw=True)
 

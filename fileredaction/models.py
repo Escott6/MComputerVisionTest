@@ -5,6 +5,10 @@ from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
 from azure.cognitiveservices.vision.computervision.models import VisualFeatureTypes
 from msrest.authentication import CognitiveServicesCredentials
+from django.conf import settings
+
+M_VISION_KEY = getattr(settings, "M_VISION_KEY")
+M_VISION_ENDPOINT = getattr(settings,"M_VISION_ENDPOINT")
 
 class Redactor: 
     
@@ -33,7 +37,6 @@ class Redactor:
     def redaction(self): 
         extension = self.path.split(".")[-1]
         # For docx
-        # TODO removes formatting for any area it redacts things for and doesn't redact from tables
         if extension == "docx":
             redacted_lines = ["phrases to redact", "test phrase2", "Yukon", "lazy", "computer", "canada", "website"]
             doc = Document(self.path)
@@ -45,7 +48,6 @@ class Redactor:
                         for i in range(len(inline)):
                             text = inline[i].text.replace(phrase,"-"*len(phrase))
                             inline[i].text = text
-#                            line.text = line.text.replace(phrase, "-"*len(phrase))
                         
 
 #            for table in doc.tables:
@@ -84,7 +86,7 @@ class Redactor:
         # For images
         elif extension == "jpg" | extension == "png" | extension == "jpeg":
 
-            computervision_client = ComputerVisionClient(endpoint, CognitiveServicesCredentials(subscription_key))
+            computervision_client = ComputerVisionClient(M_VISION_ENDPOINT, CognitiveServicesCredentials(M_VISION_KEY))
             remote_image_handw_text_url = "https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/master/articles/cognitive-services/Computer-vision/Images/readsample.jpg"
             recognize_handw_results = computervision_client.read(remote_image_handw_text_url,  raw=True)
 
