@@ -33,7 +33,7 @@ class HomeView(View):
 
 
 def pdf_view(request):
-    path = "fileredaction/sample.docx"
+    path = "fileredaction/static/fileredaction/sample.docx"
     redactor = Redactor(path)
     redactor.redaction()
     return render(request, "pdf.html")

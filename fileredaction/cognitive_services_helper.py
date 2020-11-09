@@ -15,4 +15,4 @@ def check_redacted(line, redacted_lines):
         #if re.search(redacted_lines, phrase, re.IGNORECASE):
         search = re.search(redacted_lines, phrase, re.IGNORECASE)
         if search:
-            yield search.group(0)
+            yield search.group(1)
