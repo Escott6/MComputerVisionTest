@@ -41,9 +41,12 @@ class Redactor:
             for line in doc.paragraphs:
                 for phrase in redacted_lines:
                     if line.text.find(phrase) >=0:
-                        style = line.style
-                        line.text = line.text.replace(phrase, "-"*len(phrase))
-                        line.style = style
+                        inline = line.runs
+                        for i in range(len(inline)):
+                            text = inline[i].text.replace(phrase,"-"*len(phrase))
+                            inline[i].text = text
+#                            line.text = line.text.replace(phrase, "-"*len(phrase))
+                        
 
 #            for table in doc.tables:
 #                for row in table.rows:
