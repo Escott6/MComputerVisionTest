@@ -6,15 +6,13 @@ from azure.cognitiveservices.vision.computervision.models import VisualFeatureTy
 from msrest.authentication import CognitiveServicesCredentials
 
 import time
-from re import search
-
-redactedLines = ["phrases to redact", "test phrase2", "Expo Marker", "lazy"]
-
-# Where you would actually replace the phrases in the lines of text with something else
-def check_redacted(line):
-    for phrase in redactedLines:
-        line.replace(phrase, "---")
-
-    return line 
+import re
 
 
+# Might want to replace search with findall
+def check_redacted(line, redacted_lines):
+    for phrase in line:
+        #if re.search(redacted_lines, phrase, re.IGNORECASE):
+        search = re.search(redacted_lines, phrase, re.IGNORECASE)
+        if search:
+            yield search.group(0)

@@ -1,9 +1,12 @@
 from django.http import HttpResponse
-from .cognitive_services_helper import check_redacted
+from django.views.generic import View
+
 import time
-import sys
-import os
 from array import array
+import re 
+import fitz
+from .cognitive_services_helper import check_redacted
+from django.shortcuts import render
 
 from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
@@ -13,9 +16,40 @@ from msrest.authentication import CognitiveServicesCredentials
 
 subscription_key = 'e1bf09dca0de4192a2aceaff80e4f380'
 endpoint = 'https://stagingcomputervision.cognitiveservices.azure.com/'
-redactedLines = ["phrases to redact", "test phrase2", "Expo Marker", "lazy"]
+redactedLines = ["phrases to redact", "test phrase2", "Yukon", "lazy", "computer", "canada"]
 
 
+class HomeView(View):
+    template_name = 'fileredaction/home.html'
+
+    def get_object(self):
+        return self.request.user
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["file_type"] = 'pdf' 
+        return context
+
+
+def pdf_view(request):
+    remote_pdf_url = "fileredaction/pdf-test.pdf"
+    doc = fitz.open(remote_pdf_url)
+    print(doc.FontInfos)
+    redacted_lines = '|'.join(redactedLines)
+    for page in doc:
+        page._wrapContents()
+        sensitive = check_redacted(page.getText("text").split('\n'), redacted_lines=redacted_lines) 
+        for data in sensitive: 
+            areas = page.searchFor(data) 
+                  
+                # drawing outline over sensitive datas 
+            [page.addRedactAnnot(area, fill = (0, 0, 0)) for area in areas] 
+            quads = page.searchFor("website", quads=True)
+            page.addRedactAnnot(quads)
+        # applying the redaction 
+        page.apply_redactions() 
+    doc.save('redacted.pdf')
+    return render(request, "pdf.html")
 
 def home(request):
     
