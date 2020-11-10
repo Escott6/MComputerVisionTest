@@ -6,6 +6,7 @@ from azure.cognitiveservices.vision.computervision.models import OperationStatus
 from azure.cognitiveservices.vision.computervision.models import VisualFeatureTypes
 from msrest.authentication import CognitiveServicesCredentials
 from django.conf import settings
+from docx.enum.text import WD_COLOR_INDEX
 
 M_VISION_KEY = getattr(settings, "M_VISION_KEY")
 M_VISION_ENDPOINT = getattr(settings,"M_VISION_ENDPOINT")
@@ -31,6 +32,7 @@ class Redactor:
                         for i in range(len(inline)):
                             text = inline[i].text.replace(phrase,"-"*len(phrase))
                             inline[i].text = text
+                            inline[i].font.highlight_color = WD_COLOR_INDEX.BLACK
                         
 
 #            for table in doc.tables:
