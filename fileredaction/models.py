@@ -67,7 +67,7 @@ class Redactor:
                 page.apply_redactions() 
 
             # saving it to a new pdf 
-            doc.save('redacted16.pdf') 
+            doc.save('redacted17.pdf') 
         
         # For images
         elif extension == "jpg" | extension == "png" | extension == "jpeg":
