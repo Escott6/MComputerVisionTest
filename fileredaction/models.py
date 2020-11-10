@@ -58,13 +58,10 @@ class Redactor:
                         
                         anot = page.addRedactAnnot(area, fill = (0,0,0))
                         r = anot.rect
-                        #r.x1 = r.x0 + r.width * .9
                         r.y1 = r.y0 + r.height * .9
                         r.y0 = r.y1 - r.height * .9
                         anot.setRect(r)
                         anot.update()
-                    # drawing outline over sensitive datas 
-                    #[page.addRedactAnnot(area, fill = (0, 0, 0)) for area in areas] 
 
                 # applying the redaction 
                 page.apply_redactions() 
