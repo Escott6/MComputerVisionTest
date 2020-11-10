@@ -12,33 +12,16 @@ M_VISION_ENDPOINT = getattr(settings,"M_VISION_ENDPOINT")
 
 class Redactor: 
     
-    # static methods work independent of class object 
-    @staticmethod
-    def get_sensitive_data(lines): 
-        
-        """ Function to get all the lines """
-          
-        redactedLines = ["phrases to redact", "test phrase2", "Yukon", "lazy", "computer", "canada", "website"]
-        redacted_lines = '|'.join(redactedLines)
-
-        for line in lines: 
-            
-            # matching the regex to each line 
-            if re.search(redacted_lines, line, re.IGNORECASE): 
-                search = re.search(redacted_lines, line, re.IGNORECASE) 
-                  
-                # This is probably the problem
-                yield search.group(1) 
-  
     # constructor 
     def __init__(self, path): 
         self.path = path 
   
     def redaction(self): 
+
+        redacted_lines = ["phrases to redact", "test phrase2", "Yukon", "lazy", "computer", "canada", "website"]
         extension = self.path.split(".")[-1]
         # For docx
         if extension == "docx":
-            redacted_lines = ["phrases to redact", "test phrase2", "Yukon", "lazy", "computer", "canada", "website"]
             doc = Document(self.path)
             
             for line in doc.paragraphs:
@@ -67,21 +50,21 @@ class Redactor:
 
                 # _wrapContents is needed for fixing alignment issues with rect boxes 
                 page._wrapContents() 
+                                    
+                for phrase in redacted_lines: 
+                    areas = page.searchFor(phrase) 
 
-                # geting the rect boxes which consists the matching email regex 
-                sensitive = self.get_sensitive_data(page.getText("text") 
-                                                    .split('\n')) 
-                for data in sensitive: 
-                    areas = page.searchFor(data) 
-
+                    for area in areas:
+                        
+                        page.addRedactAnnot(area, fill = (0,0,0))
                     # drawing outline over sensitive datas 
-                    [page.addRedactAnnot(area, fill = (0, 0, 0)) for area in areas] 
+                    #[page.addRedactAnnot(area, fill = (0, 0, 0)) for area in areas] 
 
                 # applying the redaction 
                 page.apply_redactions() 
 
             # saving it to a new pdf 
-            doc.save('redacted7.pdf') 
+            doc.save('redacted11.pdf') 
         
         # For images
         elif extension == "jpg" | extension == "png" | extension == "jpeg":
@@ -112,7 +95,7 @@ class Redactor:
 
                         print(var + '\n')
                         original_text += var + " "
-                        for phrase in redactedLines:
+                        for phrase in redacted_lines:
                             var = var.replace(phrase, "-"*len(phrase))
                         print(var)
                         new_text += var + " "
