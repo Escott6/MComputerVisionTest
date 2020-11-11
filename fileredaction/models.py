@@ -7,6 +7,7 @@ from azure.cognitiveservices.vision.computervision.models import VisualFeatureTy
 from msrest.authentication import CognitiveServicesCredentials
 from django.conf import settings
 from docx.enum.text import WD_COLOR_INDEX
+import copy
 
 M_VISION_KEY = getattr(settings, "M_VISION_KEY")
 M_VISION_ENDPOINT = getattr(settings,"M_VISION_ENDPOINT")
@@ -15,7 +16,17 @@ class Redactor:
     
     # constructor 
     def __init__(self, path): 
-        self.path = path 
+        self.path = path
+
+
+    def add_run_styles(self, new_run, old_run):
+        new_run.style = old_run.style
+        new_run.bold = old_run.bold
+        new_run.italic = old_run.italic
+        new_run.underline = old_run.underline
+        new_run.font.name = old_run.font.name
+        new_run.font.size = old_run.font.size
+        return new_run
   
     def redaction(self): 
 
@@ -25,16 +36,43 @@ class Redactor:
         if extension == "docx":
             doc = Document(self.path)
             
-            for line in doc.paragraphs:
+            for paragraph in doc.paragraphs:
                 for phrase in redacted_lines:
-                    if line.text.find(phrase) >=0:
-                        inline = line.runs
-                        for i in range(len(inline)):
-                            text = inline[i].text.replace(phrase,"-"*len(phrase))
-                            inline[i].text = text
-                            inline[i].font.highlight_color = WD_COLOR_INDEX.BLACK
+                    if phrase in paragraph.text: # There is something to redact
                         
+                        lines = paragraph.runs
+                        curr_runs = copy.copy(lines)
+                        paragraph.clear()
 
+                        for i in range(len(curr_runs)):
+
+                            if phrase in curr_runs[i].text: # The phrase to redact is in this run 
+                                text = curr_runs[i].text.replace(phrase,"-"*len(phrase))
+                                curr_runs[i].text = text
+                                words = re.split('(\W)', lines[i].text)
+
+                                new_run = paragraph.add_run("")
+                                
+                                for word in words:
+
+                                    if word == "-"*len(phrase):
+                                        if new_run.text != "":
+                                            new_run = self.add_run_styles(new_run, curr_runs[i])
+                                            paragraph.runs.append(new_run)
+                                        new_run = paragraph.add_run("-"*len(phrase))
+                                        new_run.font.highlight_color = WD_COLOR_INDEX.BLACK
+                                        new_run = self.add_run_styles(new_run, curr_runs[i])
+                                        paragraph.runs.append(new_run)
+                                        new_run = paragraph.add_run()
+                                    else:
+                                        new_run.text += word
+                                        
+                                if new_run != "":
+                                    new_run = self.add_run_styles(new_run, curr_runs[i])
+                                    paragraph.runs.append(new_run)
+                            else:
+                                paragraph.runs.append(curr_runs[i])
+# TODO fix tables
 #            for table in doc.tables:
 #                for row in table.rows:
 #                    for cell in row.cells:
