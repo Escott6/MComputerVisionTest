@@ -7,6 +7,8 @@ from azure.cognitiveservices.vision.computervision.models import VisualFeatureTy
 from msrest.authentication import CognitiveServicesCredentials
 from django.conf import settings
 from docx.enum.text import WD_COLOR_INDEX
+from docx.oxml.shared import OxmlElement
+from pptx import Presentation
 import copy
 
 M_VISION_KEY = getattr(settings, "M_VISION_KEY")
@@ -18,6 +20,15 @@ class Redactor:
     def __init__(self, path): 
         self.path = path
 
+    # uses the xml for the highlighting
+    def set_hightlight_xml(run):
+        rpr = run._r.get_or_add_rPr()
+        highlight = OxmlElement("a:highlight")
+        srgbClr = OxmlElement("a:srgbClr")
+        setattr(srgbClr, "val", WD_COLOR_INDEX.BLACK)
+        highlight.append(srgbClr)
+        rpr.append(highlight)
+        return run         
 
     def add_run_styles(self, new_run, old_run):
         new_run.style = old_run.style
@@ -143,3 +154,24 @@ class Redactor:
                         print(var)
                         new_text += var + " "
                         print(line.bounding_box)
+
+            # For powerpoints 
+            elif extension == "pptx":
+                presentation =  Presentation(self.path)
+                for slide in presentation.slides:
+                    for shape in slide.shapes:
+                        if hasattr(shape, "text"):
+                            for phrase in redacted_lines:
+                                if (phrase in shape.text):
+                                    text_frame = shape.text_frame
+                                    for paragraph in text_frame.paragraphs:
+                                        whole_text = "".join(run.text for run in paragraph.runs)
+                                        whole_text = whole_text.replace(phrase,"-"*len(phrase))
+                                        for idx, run in enumerate(paragraph.runs):
+                                            if idx != 0:
+                                                p = paragraph._p
+                                                p.remove(run._r)
+                                        if(not(not paragraph.runs)):
+                                            paragraph.runs[0].text = whole_text
+                presentation.save('redacted-powerpoint.pptx')
+
