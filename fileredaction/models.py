@@ -155,20 +155,17 @@ class Redactor:
             # Print the detected text, line by line
             if get_handw_text_results.status == OperationStatusCodes.succeeded:
                 for text_result in get_handw_text_results.analyze_result.read_results:
-                    print("made it here 1st for")
                     for line in text_result.lines:
                         for word in line.words:
-                            print(word.text + "\n")
                             for phrase in redacted_lines:
                                 if phrase == word.text:
-                                    print(word)
                                     loc = word.bounding_box
                                     # 
                                     draw = ImageDraw.Draw(im)
                                     # [x0,y0,x1,y1] or [(x0,y0), (x1,y1)] format
-                                    #draw.rectangle((loc[0],loc[1],loc[4],loc[6]), fill=(0,0,0))
+                                    #draw.rectangle([(loc[0], loc[1]), (loc[4], loc[5])], fill=(0,0,0))
                                     draw.polygon([(loc[0],loc[1]),(loc[2],loc[3]),(loc[4],loc[5]),(loc[6],loc[7])] ,fill=(0,0,0))
-                save_loc = 'redacted.' + extension
+                save_loc = 'redactedpoly.' + extension
                 im.save(save_loc)
 
             # For powerpoints 
