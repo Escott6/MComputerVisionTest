@@ -1,15 +1,27 @@
+""" Allows for the redaction of words or phrases from a variety of file formats """
+__author__ = "Evan Scott"
+__email__  = "escott1367@gmail.com"
+__status__ = "Prototype"
+
 import fitz 
-import re 
-from docx import Document
+import re
+import copy
+import np
+import cv2 
+from PIL import Image, ImageDraw
+from io import BytesIO
+import requests
+from django.conf import settings
+import time 
+
 from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
 from azure.cognitiveservices.vision.computervision.models import VisualFeatureTypes
 from msrest.authentication import CognitiveServicesCredentials
-from django.conf import settings
+from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
 from docx.oxml.shared import OxmlElement
 from pptx import Presentation
-import copy
 
 M_VISION_KEY = getattr(settings, "M_VISION_KEY")
 M_VISION_ENDPOINT = getattr(settings,"M_VISION_ENDPOINT")
@@ -41,7 +53,7 @@ class Redactor:
   
     def redaction(self): 
 
-        redacted_lines = ["phrases to redact", "test phrase2", "Yukon", "lazy", "computer", "canada", "website"]
+        redacted_lines = ["powerpoint", "phrases to redact", "over", "test phrase2", "jumps", "Yukon", "lazy", "computer", "canada", "website"]
         extension = self.path.split(".")[-1]
         # For docx
         if extension == "docx":
@@ -83,10 +95,10 @@ class Redactor:
                                     paragraph.runs.append(new_run)
                             else:
                                 paragraph.runs.append(curr_runs[i])
-# TODO fix tables
-#            for table in doc.tables:
-#                for row in table.rows:
-#                    for cell in row.cells:
+            # TODO fix tables
+            #            for table in doc.tables:
+            #                for row in table.rows:
+            #                    for cell in row.cells:
 
             doc.save('./redacted.docx')
 
@@ -120,17 +132,19 @@ class Redactor:
             # saving it to a new pdf 
             doc.save('redacted17.pdf') 
         
-        # For images
-        elif extension == "jpg" | extension == "png" | extension == "jpeg":
+        # For images you need to feed it single words not phrases or it will not work
+        # invert the image and dilate it, merges the letters a bit then use contours to find each word separately
+        elif extension == "jpg" or extension == "png" or extension == "jpeg":
 
             computervision_client = ComputerVisionClient(M_VISION_ENDPOINT, CognitiveServicesCredentials(M_VISION_KEY))
-            remote_image_handw_text_url = "https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/master/articles/cognitive-services/Computer-vision/Images/readsample.jpg"
-            recognize_handw_results = computervision_client.read(remote_image_handw_text_url,  raw=True)
+            recognize_handw_results = computervision_client.read(self.path,  raw=True)
 
             # Get the operation location (URL with an ID at the end) from the response
             operation_location_remote = recognize_handw_results.headers["Operation-Location"]
             # Grab the ID from the URL
             operation_id = operation_location_remote.split("/")[-1]
+            response = requests.get(self.path)
+            im = Image.open(BytesIO(response.content))
 
             while True:
                 get_handw_text_results = computervision_client.get_read_result(operation_id)
@@ -139,24 +153,26 @@ class Redactor:
                 time.sleep(1)
 
             # Print the detected text, line by line
-            original_text = ""
-            new_text = ""
             if get_handw_text_results.status == OperationStatusCodes.succeeded:
                 for text_result in get_handw_text_results.analyze_result.read_results:
+                    print("made it here 1st for")
                     for line in text_result.lines:
-
-                        var = line.text
-
-                        print(var + '\n')
-                        original_text += var + " "
-                        for phrase in redacted_lines:
-                            var = var.replace(phrase, "-"*len(phrase))
-                        print(var)
-                        new_text += var + " "
-                        print(line.bounding_box)
+                        for word in line.words:
+                            print(word.text + "\n")
+                            for phrase in redacted_lines:
+                                if phrase == word.text:
+                                    print(word)
+                                    loc = word.bounding_box
+                                    # 
+                                    draw = ImageDraw.Draw(im)
+                                    # [x0,y0,x1,y1] or [(x0,y0), (x1,y1)] format
+                                    #draw.rectangle((loc[0],loc[1],loc[4],loc[6]), fill=(0,0,0))
+                                    draw.polygon([(loc[0],loc[1]),(loc[2],loc[3]),(loc[4],loc[5]),(loc[6],loc[7])] ,fill=(0,0,0))
+                save_loc = 'redacted.' + extension
+                im.save(save_loc)
 
             # For powerpoints 
-            elif extension == "pptx":
+            elif extension == "pptx" or extension == "ppt":
                 presentation =  Presentation(self.path)
                 for slide in presentation.slides:
                     for shape in slide.shapes:

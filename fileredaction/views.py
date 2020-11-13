@@ -33,9 +33,11 @@ class HomeView(View):
         context["file_type"] = 'pdf' 
         return context
 
+# remote_image_handw_text_url = "https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/master/articles/cognitive-services/Computer-vision/Images/readsample.jpg"
 
 def pdf_view(request):
-    path = "fileredaction/static/fileredaction/sample.docx"
+    path = "https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/master/articles/cognitive-services/Computer-vision/Images/readsample.jpg".strip()
+    #path = "fileredaction/static/fileredaction/sample.docx"
     redactor = Redactor(path)
     redactor.redaction()
     return render(request, "pdf.html")
