@@ -72,10 +72,10 @@ class Redactor:
         curr_runs = copy.copy(paragraph.runs)    # copy the paragraph and clear it 
         new_paragraph = paragraph.clear()
         for i in range(len(curr_runs)): # Find which run contains the phrase
-            if phrase in curr_runs[i].text: # The phrase to redact is in this run 
+            if phrase.casefold() in curr_runs[i].text.casefold(): # The phrase to redact is in this run 
                 # Replace the word with the dash_word to redact the phrase
                 dash_word = "#"*len(phrase)
-                text = curr_runs[i].text.replace(phrase, dash_word)
+                text = re.sub(re.escape(phrase),dash_word,curr_runs[i].text, flags=re.IGNORECASE)
                 curr_runs[i].text = text
                 # Split by the dash_word to add highlighting 
                 words = re.split('(#+)', curr_runs[i].text)
@@ -117,15 +117,17 @@ class Redactor:
             doc = Document(self.path)
             # Clear one paragraph at a time 
             for paragraph in doc.paragraphs:
-                lines = paragraph.runs
                 for phrase in redacted_lines:
-                    if phrase in paragraph.text: # There is something to redact
+                    if phrase.casefold() in paragraph.text.casefold(): # There is something to redact
                        paragraph = self.paragraph_rewrite(paragraph, phrase)
-
-            # TODO fix tables
-            #            for table in doc.tables:
-            #                for row in table.rows:
-            #                    for cell in row.cells:
+        
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for paragraph in cell.paragraphs:
+                            for phrase in redacted_lines:
+                                if phrase.casefold() in paragraph.text.casefold():
+                                    paragraph = self.paragraph_rewrite(paragraph,phrase)
 
             doc.save('./redacted.docx')
 
