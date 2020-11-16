@@ -6,8 +6,6 @@ __status__ = "Prototype"
 import fitz 
 import re
 import copy
-import np
-import cv2 
 from PIL import Image, ImageDraw
 from io import BytesIO
 import requests
