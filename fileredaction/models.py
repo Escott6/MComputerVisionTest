@@ -104,6 +104,7 @@ class Redactor:
                                             new_run = paragraph.add_run(text_string)
                                             new_run = self.add_run_styles(new_run, curr_runs[i])
                                         # If it is a fresh_run just create a new run containing only the redacted word and add it
+                                        text_string = ""
                                         new_run2 = paragraph.add_run(dash_word)
                                         new_run2 = self.add_run_styles(new_run2, curr_runs[i])
                                         new_run2.font.highlight_color = WD_COLOR_INDEX.BLACK
