@@ -21,6 +21,7 @@ from msrest.authentication import CognitiveServicesCredentials
 from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
 from docx.oxml.shared import OxmlElement
+from docx.text.run import Run
 from pptx import Presentation
 
 M_VISION_KEY = getattr(settings, "M_VISION_KEY")
@@ -58,31 +59,29 @@ class Redactor:
         # For docx
         if extension == "docx":
             doc = Document(self.path)
-            
+            # Clear one paragraph at a time 
             for paragraph in doc.paragraphs:
+                lines = paragraph.runs
                 for phrase in redacted_lines:
                     if phrase in paragraph.text: # There is something to redact
-                        
-                        lines = paragraph.runs
-                        curr_runs = copy.copy(lines)
-                        paragraph.clear()
-
-                        for i in range(len(curr_runs)):
-
+                        curr_runs = copy.copy(lines)    # copy the paragraph and clear it 
+                        paragraph.clear()   
+                        for i in range(len(curr_runs)): # Find which run contains the phrase
                             if phrase in curr_runs[i].text: # The phrase to redact is in this run 
-                                text = curr_runs[i].text.replace(phrase,"-"*len(phrase))
+                                # Replace the word with the dash_word to redact the phrase
+                                dash_word = "#"*len(phrase)
+                                text = curr_runs[i].text.replace(phrase, dash_word)
                                 curr_runs[i].text = text
-                                words = re.split('(\W)', curr_runs[i].text)
+                                # Split by the dash_word to add highlighting 
 
-                                new_run = paragraph.add_run("")
-                                
+                                words = re.split('(#+)', curr_runs[i].text)
+                                new_run = paragraph.add_run("") # Start an empty run 
                                 for word in words:
-
-                                    if word == "-"*len(phrase):
+                                    if word == dash_word:
                                         if new_run.text != "":
                                             new_run = self.add_run_styles(new_run, curr_runs[i])
                                             paragraph.runs.append(new_run)
-                                        new_run = paragraph.add_run("-"*len(phrase))
+                                        new_run = paragraph.add_run(dash_word)
                                         new_run.font.highlight_color = WD_COLOR_INDEX.BLACK
                                         new_run = self.add_run_styles(new_run, curr_runs[i])
                                         paragraph.runs.append(new_run)
@@ -93,8 +92,13 @@ class Redactor:
                                 if new_run != "":
                                     new_run = self.add_run_styles(new_run, curr_runs[i])
                                     paragraph.runs.append(new_run)
+                                
+                            
                             else:
+                                #Append the run as there is nothing to change
                                 paragraph.runs.append(curr_runs[i])
+                                print(curr_runs[i].text + "\n")
+
             # TODO fix tables
             #            for table in doc.tables:
             #                for row in table.rows:
@@ -189,4 +193,8 @@ class Redactor:
             presentation.save('redacted-powerpoint.pptx')
 
         elif extension == "txt":
-            txt_file = open(self.path, "r+")
+            with open(self.path, "r+") as txt_file:
+                for line in txt_file.readlines():
+                    for phrase in redacted_lines:
+                        if phrase in txt_file:
+                            line.replace(phrase,"-"*len(phrase))
