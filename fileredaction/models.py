@@ -22,6 +22,7 @@ from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
 from docx.oxml.shared import OxmlElement
 from docx.text.run import Run
+import docx.dml.color
 from pptx import Presentation
 
 M_VISION_KEY = getattr(settings, "M_VISION_KEY")
@@ -48,12 +49,28 @@ class Redactor:
         new_run.bold = old_run.bold
         new_run.italic = old_run.italic
         new_run.underline = old_run.underline
+        new_run.font.all_caps = old_run.font.all_caps
+        color = new_run.font.color
+        color.rgb = old_run.font.color.rgb
+        new_run.font.complex_script = old_run.font.complex_script
+        new_run.font.double_strike = old_run.font.double_strike
+        new_run.font.emboss = old_run.font.emboss
+        new_run.font.highlight_color = old_run.font.highlight_color
+        new_run.font.imprint = old_run.font.imprint 
+        new_run.font.math = old_run.font.math
         new_run.font.name = old_run.font.name
+        new_run.font.outline = old_run.font.outline
+        new_run.font.shadow = old_run.font.shadow
         new_run.font.size = old_run.font.size
+        new_run.font.small_caps = old_run.font.small_caps
+        new_run.font.snap_to_grid = old_run.font.snap_to_grid
+        new_run.font.strike = old_run.font.strike
+        new_run.font.subscript = old_run.font.subscript
+        new_run.font.superscript = old_run.font.superscript
         return new_run
-  
-    def redaction(self): 
 
+
+    def redaction(self): 
         redacted_lines = ["powerpoint", "phrases to redact", "over", "test phrase2", "jumps", "Yukon", "lazy", "computer", "canada", "website"]
         extension = self.path.split(".")[-1]
         # For docx
@@ -73,40 +90,49 @@ class Redactor:
                                 text = curr_runs[i].text.replace(phrase, dash_word)
                                 curr_runs[i].text = text
                                 # Split by the dash_word to add highlighting 
-
+                                """
                                 new_run_element = paragraph._element._new_r()
                                 curr_runs[i]._element.addnext(new_run_element)
                                 new_run = Run(new_run_element, curr_runs[i]._parent)
                                 # ---do things with new_run, e.g.---
                                 new_run.text = dash_word
-                                new_run.font.highlight_color = WD_COLOR_INDEX.BLACK
                                 new_run = self.add_run_styles(new_run, curr_runs[i])
-                                
+                                new_run.font.highlight_color = WD_COLOR_INDEX.BLACK
+                                """ 
                                 
                                 words = re.split('(#+)', curr_runs[i].text)
-                                new_run = paragraph.add_run("") # Start an empty run 
+                                new_run = paragraph.add_run() # Start an empty run 
+                                
+                                #Search for the redacted word in the run 
                                 for word in words:
+                                    # if the word is the redacted word create new run and black it out 
                                     if word == dash_word:
+                                        # if the new_run has words attached to it add it to the paragraph and create a new 
+                                        # run for the redacted word
                                         if new_run.text != "":
-                                            new_run = self.add_run_styles(new_run, curr_runs[i])
                                             paragraph.runs.append(new_run)
+                                            new_run = paragraph.add_run(new_run.text)
+                                            new_run = self.add_run_styles(new_run, curr_runs[i])
+                                        # If it is a fresh_run just create a new run containing only the redacted word and add it
                                         new_run = paragraph.add_run(dash_word)
-                                        new_run.font.highlight_color = WD_COLOR_INDEX.BLACK
                                         new_run = self.add_run_styles(new_run, curr_runs[i])
+                                        new_run.font.highlight_color = WD_COLOR_INDEX.BLACK
                                         paragraph.runs.append(new_run)
                                         new_run = paragraph.add_run()
+                                    # else just add the word to the existing text
                                     else:
                                         new_run.text += word
-                                        
+                                # Deals with the remainder of the run after the phrase has been found
                                 if new_run != "":
+                                    print(new_run.text + "\n")
                                     new_run = self.add_run_styles(new_run, curr_runs[i])
                                     paragraph.runs.append(new_run)
-                                
                             
                             else:
                                 #Append the run as there is nothing to change
-                                paragraph.add_run(curr_runs[i].text)
-                                print(curr_runs[i].text + "\n")
+                                #TODO cannot recognize the highlight color of the doc might need to go into lxml
+                                new_run = paragraph.add_run(curr_runs[i].text)
+                                new_run = self.add_run_styles(new_run, curr_runs[i])
 
             # TODO fix tables
             #            for table in doc.tables:
