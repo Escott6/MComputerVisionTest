@@ -33,7 +33,7 @@ class Redactor:
         self.path = path
 
     # uses the xml for the highlighting
-    def set_hightlight_xml(run):
+    def set_hightlight_xml(self, run):
         rpr = run._r.get_or_add_rPr()
         highlight = OxmlElement("a:highlight")
         srgbClr = OxmlElement("a:srgbClr")
@@ -72,7 +72,7 @@ class Redactor:
                             if phrase in curr_runs[i].text: # The phrase to redact is in this run 
                                 text = curr_runs[i].text.replace(phrase,"-"*len(phrase))
                                 curr_runs[i].text = text
-                                words = re.split('(\W)', lines[i].text)
+                                words = re.split('(\W)', curr_runs[i].text)
 
                                 new_run = paragraph.add_run("")
                                 
@@ -169,22 +169,24 @@ class Redactor:
                 im.save(save_loc)
 
             # For powerpoints 
-            elif extension == "pptx" or extension == "ppt":
-                presentation =  Presentation(self.path)
-                for slide in presentation.slides:
-                    for shape in slide.shapes:
-                        if hasattr(shape, "text"):
-                            for phrase in redacted_lines:
-                                if (phrase in shape.text):
-                                    text_frame = shape.text_frame
-                                    for paragraph in text_frame.paragraphs:
-                                        whole_text = "".join(run.text for run in paragraph.runs)
-                                        whole_text = whole_text.replace(phrase,"-"*len(phrase))
-                                        for idx, run in enumerate(paragraph.runs):
-                                            if idx != 0:
-                                                p = paragraph._p
-                                                p.remove(run._r)
-                                        if(not(not paragraph.runs)):
-                                            paragraph.runs[0].text = whole_text
-                presentation.save('redacted-powerpoint.pptx')
+        elif extension == "pptx" or extension == "ppt":
+            presentation =  Presentation(self.path)
+            for slide in presentation.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        for phrase in redacted_lines:
+                            if (phrase in shape.text):
+                                text_frame = shape.text_frame
+                                for paragraph in text_frame.paragraphs:
+                                    whole_text = "".join(run.text for run in paragraph.runs)
+                                    whole_text = whole_text.replace(phrase,"-"*len(phrase))
+                                    for idx, run in enumerate(paragraph.runs):
+                                        if idx != 0:
+                                            p = paragraph._p
+                                            p.remove(run._r)
+                                    if(not(not paragraph.runs)):
+                                        paragraph.runs[0].text = whole_text
+            presentation.save('redacted-powerpoint.pptx')
 
+        elif extension == "txt":
+            txt_file = open(self.path, "r+")
