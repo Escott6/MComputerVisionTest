@@ -74,6 +74,15 @@ class Redactor:
                                 curr_runs[i].text = text
                                 # Split by the dash_word to add highlighting 
 
+                                new_run_element = paragraph._element._new_r()
+                                curr_runs[i]._element.addnext(new_run_element)
+                                new_run = Run(new_run_element, curr_runs[i]._parent)
+                                # ---do things with new_run, e.g.---
+                                new_run.text = dash_word
+                                new_run.font.highlight_color = WD_COLOR_INDEX.BLACK
+                                new_run = self.add_run_styles(new_run, curr_runs[i])
+                                
+                                
                                 words = re.split('(#+)', curr_runs[i].text)
                                 new_run = paragraph.add_run("") # Start an empty run 
                                 for word in words:
@@ -96,7 +105,7 @@ class Redactor:
                             
                             else:
                                 #Append the run as there is nothing to change
-                                paragraph.runs.append(curr_runs[i])
+                                paragraph.add_run(curr_runs[i].text)
                                 print(curr_runs[i].text + "\n")
 
             # TODO fix tables
