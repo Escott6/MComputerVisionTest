@@ -69,9 +69,44 @@ class Redactor:
 
 
     def paragraph_rewrite(self, paragraph, phrase):
-        #test
-        pass;
-
+        curr_runs = copy.copy(paragraph.runs)    # copy the paragraph and clear it 
+        new_paragraph = paragraph.clear()
+        for i in range(len(curr_runs)): # Find which run contains the phrase
+            if phrase in curr_runs[i].text: # The phrase to redact is in this run 
+                # Replace the word with the dash_word to redact the phrase
+                dash_word = "#"*len(phrase)
+                text = curr_runs[i].text.replace(phrase, dash_word)
+                curr_runs[i].text = text
+                # Split by the dash_word to add highlighting 
+                words = re.split('(#+)', curr_runs[i].text)
+                text_string = ""
+                #Search for the redacted word in the run 
+                for word in words:
+                    # if the word is the redacted word create new run and black it out 
+                    if word == dash_word:
+                        # if the new_run has words attached to it add it to the paragraph and create a new 
+                        # run for the redacted word
+                        if text_string != "":
+                            new_run = new_paragraph.add_run(text_string)
+                            new_run = self.add_run_styles(new_run, curr_runs[i])
+                        # If it is a fresh_run just create a new run containing only the redacted word and add it
+                        text_string = ""
+                        new_run = new_paragraph.add_run(dash_word)
+                        new_run = self.add_run_styles(new_run, curr_runs[i])
+                        new_run.font.highlight_color = WD_COLOR_INDEX.BLACK
+                    # else just add the word to the existing text
+                    else:
+                        text_string += word
+                # Deals with the remainder of the run after the phrase has been found
+                if text_string != "":
+                    new_run = new_paragraph.add_run(text_string)
+                    new_run = self.add_run_styles(new_run, curr_runs[i])
+            else:
+                #Append the run as there is nothing to change
+                #TODO cannot recognize the highlight color of the doc might need to go into lxml
+                new_run = new_paragraph.add_run(curr_runs[i].text)
+                new_run = self.add_run_styles(new_run, curr_runs[i])
+        return new_paragraph
 
 
     def redaction(self): 
@@ -85,43 +120,7 @@ class Redactor:
                 lines = paragraph.runs
                 for phrase in redacted_lines:
                     if phrase in paragraph.text: # There is something to redact
-                        curr_runs = copy.copy(lines)    # copy the paragraph and clear it 
-                        paragraph.clear()
-                        for i in range(len(curr_runs)): # Find which run contains the phrase
-                            if phrase in curr_runs[i].text: # The phrase to redact is in this run 
-                                # Replace the word with the dash_word to redact the phrase
-                                dash_word = "#"*len(phrase)
-                                text = curr_runs[i].text.replace(phrase, dash_word)
-                                curr_runs[i].text = text
-                                # Split by the dash_word to add highlighting 
-                                words = re.split('(#+)', curr_runs[i].text)
-                                text_string = ""
-                                #Search for the redacted word in the run 
-                                for word in words:
-                                    # if the word is the redacted word create new run and black it out 
-                                    if word == dash_word:
-                                        # if the new_run has words attached to it add it to the paragraph and create a new 
-                                        # run for the redacted word
-                                        if text_string != "":
-                                            new_run = paragraph.add_run(text_string)
-                                            new_run = self.add_run_styles(new_run, curr_runs[i])
-                                        # If it is a fresh_run just create a new run containing only the redacted word and add it
-                                        text_string = ""
-                                        new_run = paragraph.add_run(dash_word)
-                                        new_run = self.add_run_styles(new_run, curr_runs[i])
-                                        new_run.font.highlight_color = WD_COLOR_INDEX.BLACK
-                                    # else just add the word to the existing text
-                                    else:
-                                        text_string += word
-                                # Deals with the remainder of the run after the phrase has been found
-                                if text_string != "":
-                                    new_run = paragraph.add_run(text_string)
-                                    new_run = self.add_run_styles(new_run, curr_runs[i])
-                            else:
-                                #Append the run as there is nothing to change
-                                #TODO cannot recognize the highlight color of the doc might need to go into lxml
-                                new_run = paragraph.add_run(curr_runs[i].text)
-                                new_run = self.add_run_styles(new_run, curr_runs[i])
+                       paragraph = self.paragraph_rewrite(paragraph, phrase)
 
             # TODO fix tables
             #            for table in doc.tables:
