@@ -22,6 +22,8 @@ from docx.oxml.shared import OxmlElement
 from docx.text.run import Run
 import docx.dml.color
 from pptx import Presentation
+from pptx.dml.color import RGBColor
+import csv
 
 M_VISION_KEY = getattr(settings, "M_VISION_KEY")
 M_VISION_ENDPOINT = getattr(settings,"M_VISION_ENDPOINT")
@@ -42,29 +44,43 @@ class Redactor:
         rpr.append(highlight)
         return run         
 
-    def add_run_styles(self, new_run, old_run):
-        new_run.style = old_run.style
-        new_run.bold = old_run.bold
-        new_run.italic = old_run.italic
-        new_run.underline = old_run.underline
-        new_run.font.all_caps = old_run.font.all_caps
-        color = new_run.font.color
-        color.rgb = old_run.font.color.rgb
-        new_run.font.complex_script = old_run.font.complex_script
-        new_run.font.double_strike = old_run.font.double_strike
-        new_run.font.emboss = old_run.font.emboss
-        new_run.font.highlight_color = old_run.font.highlight_color
-        new_run.font.imprint = old_run.font.imprint 
-        new_run.font.math = old_run.font.math
+    def add_run_styles(self, new_run, old_run, pptx):
+        
         new_run.font.name = old_run.font.name
-        new_run.font.outline = old_run.font.outline
-        new_run.font.shadow = old_run.font.shadow
         new_run.font.size = old_run.font.size
-        new_run.font.small_caps = old_run.font.small_caps
-        new_run.font.snap_to_grid = old_run.font.snap_to_grid
-        new_run.font.strike = old_run.font.strike
-        new_run.font.subscript = old_run.font.subscript
-        new_run.font.superscript = old_run.font.superscript
+        
+        if not pptx:
+            color = new_run.font.color
+            color.rgb = old_run.font.color.rgb
+            new_run.bold = old_run.bold
+            new_run.italic = old_run.italic
+            new_run.style = old_run.style
+            new_run.underline = old_run.underline
+            new_run.font.all_caps = old_run.font.all_caps
+            new_run.font.complex_script = old_run.font.complex_script
+            new_run.font.double_strike = old_run.font.double_strike
+            new_run.font.emboss = old_run.font.emboss
+            new_run.font.highlight_color = old_run.font.highlight_color
+            new_run.font.imprint = old_run.font.imprint 
+            new_run.font.math = old_run.font.math
+            new_run.font.outline = old_run.font.outline
+            new_run.font.shadow = old_run.font.shadow
+            new_run.font.small_caps = old_run.font.small_caps
+            new_run.font.snap_to_grid = old_run.font.snap_to_grid
+            new_run.font.strike = old_run.font.strike
+            new_run.font.subscript = old_run.font.subscript
+            new_run.font.superscript = old_run.font.superscript
+        else:
+            new_run.font.bold = old_run.font.bold
+            color = old_run.font.color
+            new_run.font.color._color = color._color
+            new_run.font.color._xFill = color._xFill  
+            fill = old_run.font.fill
+            new_run.font.fill._xPr = fill._xPr
+            new_run.font.fill._fill = fill._fill
+            new_run.font.italic = old_run.font.italic
+            new_run.font.underline = old_run.font.underline
+
         return new_run
 
 
@@ -75,7 +91,7 @@ class Redactor:
             if phrase.casefold() in curr_runs[i].text.casefold(): # The phrase to redact is in this run 
                 # Replace the word with the dash_word to redact the phrase
                 dash_word = "#"*len(phrase)
-                text = re.sub(re.escape(phrase),dash_word,curr_runs[i].text, flags=re.IGNORECASE)
+                text = re.sub(r'\b%s\b' % re.escape(phrase), dash_word, curr_runs[i].text, flags=re.IGNORECASE)
                 curr_runs[i].text = text
                 # Split by the dash_word to add highlighting 
                 words = re.split('(#+)', curr_runs[i].text)
@@ -88,11 +104,11 @@ class Redactor:
                         # run for the redacted word
                         if text_string != "":
                             new_run = new_paragraph.add_run(text_string)
-                            new_run = self.add_run_styles(new_run, curr_runs[i])
+                            new_run = self.add_run_styles(new_run, curr_runs[i], False)
                         # If it is a fresh_run just create a new run containing only the redacted word and add it
                         text_string = ""
                         new_run = new_paragraph.add_run(dash_word)
-                        new_run = self.add_run_styles(new_run, curr_runs[i])
+                        new_run = self.add_run_styles(new_run, curr_runs[i], False)
                         new_run.font.highlight_color = WD_COLOR_INDEX.BLACK
                     # else just add the word to the existing text
                     else:
@@ -100,14 +116,57 @@ class Redactor:
                 # Deals with the remainder of the run after the phrase has been found
                 if text_string != "":
                     new_run = new_paragraph.add_run(text_string)
-                    new_run = self.add_run_styles(new_run, curr_runs[i])
+                    new_run = self.add_run_styles(new_run, curr_runs[i], False)
             else:
                 #Append the run as there is nothing to change
                 #TODO cannot recognize the highlight color of the doc might need to go into lxml
                 new_run = new_paragraph.add_run(curr_runs[i].text)
-                new_run = self.add_run_styles(new_run, curr_runs[i])
+                new_run = self.add_run_styles(new_run, curr_runs[i], False)
         return new_paragraph
 
+    def powerpoint_rewrite(self, paragraph, phrase):
+        curr_runs = copy.copy(paragraph.runs)
+        new_paragraph = paragraph.clear()
+        for i, run in enumerate(curr_runs):
+            # it is a tuple 
+            if phrase.casefold() in run.text.casefold(): # The phrase to redact is in this run 
+                # Replace the word with the dash_word to redact the phrase
+                dash_word = "#"*len(phrase)
+                text = re.sub(r'\b%s\b' % re.escape(phrase), dash_word, run.text, flags=re.IGNORECASE)
+                run.text = text
+                # Split by the dash_word to add highlighting 
+                words = re.split('(#+)', run.text)
+                text_string = ""
+                #Search for the redacted word in the run 
+                for word in words:
+                    if word == dash_word:
+                        # if the new_run has words attached to it add it to the paragraph and create a new 
+                        # run for the redacted word
+                        if text_string != "":
+                            new_run = new_paragraph.add_run()
+                            new_run.text = text_string
+                            new_run = self.add_run_styles(new_run, curr_runs[i], True)
+                        # If it is a fresh_run just create a new run containing only the redacted word and add it
+                        text_string = ""
+                        new_run = new_paragraph.add_run()
+                        new_run.text = dash_word
+                        new_run = self.add_run_styles(new_run, curr_runs[i], True)
+                        new_run.font.fill.rgb = RGBColor(255,255,255)
+                    # else just add the word to the existing text
+                    else:
+                        text_string += word
+                if text_string != "":
+                    new_run = new_paragraph.add_run()
+                    new_run.text = text_string
+                    new_run = self.add_run_styles(new_run, curr_runs[i], True)
+            else:
+                #Append the run as there is nothing to change
+                #TODO cannot recognize the highlight color of the doc might need to go into lxml
+                new_run = new_paragraph.add_run()
+                new_run.text = run.text
+                new_run = self.add_run_styles(new_run, curr_runs[i], True)
+        return new_paragraph
+                
 
     def redaction(self): 
         redacted_lines = ["powerpoint","ipsum", "phrases to redact", "over", "test phrase2", "jumps", "Yukon", "lazy", "computer", "canada", "website"]
@@ -127,7 +186,7 @@ class Redactor:
                         for paragraph in cell.paragraphs:
                             for phrase in redacted_lines:
                                 if phrase.casefold() in paragraph.text.casefold():
-                                    paragraph = self.paragraph_rewrite(paragraph,phrase)
+                                    paragraph = self.paragraph_rewrite(paragraph, phrase)
 
             doc.save('./redacted.docx')
 
@@ -197,8 +256,8 @@ class Redactor:
                 save_loc = 'redactedpoly.' + extension
                 im.save(save_loc)
 
-            # For powerpoints 
-        elif extension == "pptx" or extension == "ppt":
+        # For powerpoints 
+        elif extension == "pptx":
             presentation =  Presentation(self.path)
             for slide in presentation.slides:
                 for shape in slide.shapes:
@@ -206,14 +265,28 @@ class Redactor:
                         text_frame = shape.text_frame
                         for paragraph in text_frame.paragraphs:
                             for phrase in redacted_lines:
-                                if phrase.casefold() in shape.text.casefold():
-                                    paragraph = self.paragraph_rewrite(paragraph, phrase)
+                                if paragraph is not None  and phrase.casefold() in paragraph.text.casefold():
+                                    paragraph = self.powerpoint_rewrite(paragraph, phrase)
 
             presentation.save('redacted-powerpoint.pptx')
 
         elif extension == "txt":
-            with open(self.path, "r+") as txt_file:
+            with open(self.path, "r") as txt_file:
+                new_file = open('../', mode ='w')
                 for line in txt_file.readlines():
                     for phrase in redacted_lines:
                         if phrase in txt_file:
-                            line.replace(phrase,"-"*len(phrase))
+                            new_file.write(line.replace(phrase,"#"*len(phrase)))
+                new_file.close()
+
+        elif extension == "csv":
+            # csv 
+            pass
+
+        elif extension == "xls":
+            #xls
+            pass
+
+        elif extension == 'xml':
+            #xml
+            pass 
