@@ -19,7 +19,7 @@ from django.conf import settings
 
 M_VISION_KEY = getattr(settings, "M_VISION_KEY")
 M_VISION_ENDPOINT = getattr(settings,"M_VISION_ENDPOINT")
-redactedLines = ["phrases to redact", "test phrase2", "Yukon", "lazy", "computer", "canada", "website"]
+redactedLines = ["phrases to redact", "software", "slide","test phrase2", "Yukon", "lazy", "computer", "canada", "website"]
 
 
 class HomeView(View):

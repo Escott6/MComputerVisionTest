@@ -203,18 +203,12 @@ class Redactor:
             for slide in presentation.slides:
                 for shape in slide.shapes:
                     if hasattr(shape, "text"):
-                        for phrase in redacted_lines:
-                            if (phrase in shape.text):
-                                text_frame = shape.text_frame
-                                for paragraph in text_frame.paragraphs:
-                                    whole_text = "".join(run.text for run in paragraph.runs)
-                                    whole_text = whole_text.replace(phrase,"-"*len(phrase))
-                                    for idx, run in enumerate(paragraph.runs):
-                                        if idx != 0:
-                                            p = paragraph._p
-                                            p.remove(run._r)
-                                    if(not(not paragraph.runs)):
-                                        paragraph.runs[0].text = whole_text
+                        text_frame = shape.text_frame
+                        for paragraph in text_frame.paragraphs:
+                            for phrase in redacted_lines:
+                                if phrase.casefold() in shape.text.casefold():
+                                    paragraph = self.paragraph_rewrite(paragraph, phrase)
+
             presentation.save('redacted-powerpoint.pptx')
 
         elif extension == "txt":
