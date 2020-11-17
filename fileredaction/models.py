@@ -22,7 +22,7 @@ from docx.oxml.shared import OxmlElement
 from docx.text.run import Run
 import docx.dml.color
 from pptx import Presentation
-from pptx.dml.color import RGBColor
+from pptx.dml.color import RGBColor, ColorFormat
 import csv
 
 M_VISION_KEY = getattr(settings, "M_VISION_KEY")
@@ -74,7 +74,7 @@ class Redactor:
             new_run.font.bold = old_run.font.bold
             color = old_run.font.color
             new_run.font.color._color = color._color
-            new_run.font.color._xFill = color._xFill  
+            new_run.font.color._xFill = color._xFill
             fill = old_run.font.fill
             new_run.font.fill._xPr = fill._xPr
             new_run.font.fill._fill = fill._fill
@@ -151,7 +151,11 @@ class Redactor:
                         new_run = new_paragraph.add_run()
                         new_run.text = dash_word
                         new_run = self.add_run_styles(new_run, curr_runs[i], True)
-                        new_run.font.fill.rgb = RGBColor(255,255,255)
+                        #color_format = ColorFormat()
+                        new_run.font.fill.rgb = RGBColor(0,0,0)
+                        new_run.font.fill._xPr = RGBColor(0,0,0)
+                        new_run.font.fill._fill = RGBColor(0,0,0)
+#                        new_run.font._fill._fore_color = color_format
                     # else just add the word to the existing text
                     else:
                         text_string += word
