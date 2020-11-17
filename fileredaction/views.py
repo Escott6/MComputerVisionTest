@@ -37,7 +37,7 @@ class HomeView(View):
 
 def pdf_view(request):
     #path = "https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/master/articles/cognitive-services/Computer-vision/Images/readsample.jpg".strip()
-    path = "fileredaction/static/fileredaction/sample.xml"
+    path = "fileredaction/static/fileredaction/sample.xlsx"
     redactor = Redactor(path)
     redactor.redaction()
     return render(request, "pdf.html")

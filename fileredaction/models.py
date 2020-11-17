@@ -25,6 +25,8 @@ import docx.dml.color
 from pptx import Presentation
 from pptx.dml.color import RGBColor, ColorFormat
 from defusedxml.ElementTree import parse
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Font
 import csv
 
 M_VISION_KEY = getattr(settings, "M_VISION_KEY")
@@ -304,8 +306,20 @@ class Redactor:
 
         # For xls files
         elif extension == "xlsx":
-            #xls
-            pass
+            workbook = load_workbook(self.path)
+            worksheets = workbook.worksheets
+            for sheet in worksheets:
+                for row in sheet.iter_rows():
+                    for cell in row:
+                        for phrase in redacted_lines:
+                            if phrase in str(cell.value):
+                                # Currently blacks out entire cell may not want to do this or at least set a flag
+                                dash_word = "#"*len(phrase)
+                                cell.value = re.sub(r'\b%s\b' % re.escape(phrase), dash_word, str(cell.value), flags=re.IGNORECASE)
+                                cell.fill = PatternFill(bgColor="000000", fill_type = "solid")
+                                cell.font = Font(color = '000000')
+            workbook.save('redacted.xlsx')
+                        
 
         # For xml files - need to use defusedxml to avoid a bomb
         elif extension == 'xml':
