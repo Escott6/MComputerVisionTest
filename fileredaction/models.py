@@ -3,6 +3,7 @@ __author__ = "Evan Scott"
 __email__  = "escott1367@gmail.com"
 __status__ = "Prototype"
 
+from os import write
 import fitz 
 import re
 import copy
@@ -23,6 +24,7 @@ from docx.text.run import Run
 import docx.dml.color
 from pptx import Presentation
 from pptx.dml.color import RGBColor, ColorFormat
+from defusedxml.ElementTree import parse
 import csv
 
 M_VISION_KEY = getattr(settings, "M_VISION_KEY")
@@ -199,21 +201,16 @@ class Redactor:
 
         # For pdfs
         elif extension == "pdf":
-
             # opening the pdf 
             doc = fitz.open(self.path) 
-
             # iterating through pages 
             for page in doc: 
-
                 # _wrapContents is needed for fixing alignment issues with rect boxes 
                 page._wrapContents() 
                                     
                 for phrase in redacted_lines: 
                     areas = page.searchFor(phrase) 
-
                     for area in areas:
-                        
                         anot = page.addRedactAnnot(area, fill = (0,0,0))
                         r = anot.rect
                         r.y1 = r.y0 + r.height * .9
@@ -277,23 +274,45 @@ class Redactor:
 
             presentation.save('redacted-powerpoint.pptx')
 
+        # For plain text files
         elif extension == "txt":
             with open(self.path, "r") as txt_file:
                 new_file = open('../', mode ='w')
                 for line in txt_file.readlines():
                     for phrase in redacted_lines:
-                        if phrase in txt_file:
-                            new_file.write(line.replace(phrase,"#"*len(phrase)))
+                        if phrase in line:
+                            dash_word = "#"*len(phrase)
+                            new_text = re.sub(r'\b%s\b' % re.escape(phrase), dash_word, line, flags=re.IGNORECASE)
+                            new_file.write(new_text)
                 new_file.close()
 
+        # for csv files 
         elif extension == "csv":
-            # csv 
-            pass
+            lines = list()
+            with open(self.path) as csvfile:
+                reader = csv.reader(csvfile, delimiter= ' ', quotechar = '|')
+                for row in reader:
+                    for field in row:
+                        for phrase in redacted_lines:
+                            if phrase in field: # Get rid of the phrase if it exists before adding the row
+                                dash_word = "#"*len(phrase)
+                                field = re.sub(r'\b%s\b' % re.escape(phrase), dash_word, field, flags=re.IGNORECASE)
+                            lines.append(row)
+            with open('redacted-csv.csv', 'w') as writeFile:
+                writer = csv.writer(writeFile)
+                writer.writerow(lines)
 
-        elif extension == "xls":
+        # For xls files
+        elif extension == "xlsx":
             #xls
             pass
 
+        # For xml files - need to use defusedxml to avoid a bomb
         elif extension == 'xml':
-            #xml
-            pass 
+            tree = parse(self.path)
+            for elem in tree.iter():
+                for phrase in redacted_lines:
+                    if elem.text is not None and phrase in elem.text:
+                        dash_word = "#"*len(phrase)
+                        elem.text = re.sub(r'\b%s\b' % re.escape(phrase), dash_word, elem.text, flags=re.IGNORECASE)
+            tree.write('redacted.xml')
