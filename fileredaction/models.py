@@ -151,11 +151,14 @@ class Redactor:
                         new_run = new_paragraph.add_run()
                         new_run.text = dash_word
                         new_run = self.add_run_styles(new_run, curr_runs[i], True)
-                        #color_format = ColorFormat()
+                        
+                        color_format = ColorFormat(RGBColor(0,0,0),RGBColor(0,0,0))
+                        print(str(color_format.__dict__))
                         new_run.font.fill.rgb = RGBColor(0,0,0)
                         new_run.font.fill._xPr = RGBColor(0,0,0)
                         new_run.font.fill._fill = RGBColor(0,0,0)
-#                        new_run.font._fill._fore_color = color_format
+                        new_run.font.fill._fore_color = color_format
+                        new_run.font.fill._back_color = color_format
                     # else just add the word to the existing text
                     else:
                         text_string += word
