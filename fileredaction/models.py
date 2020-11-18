@@ -200,6 +200,7 @@ class Redactor:
                                     paragraph = self.paragraph_rewrite(paragraph, phrase)
 
             doc.save('./redacted.docx')
+            return('redacted.docx')
 
         # For pdfs
         elif extension == "pdf":
@@ -224,7 +225,9 @@ class Redactor:
                 page.apply_redactions() 
 
             # saving it to a new pdf 
-            doc.save('redacted17.pdf') 
+            doc.save('redacted17.pdf')
+            return('redacted17.pdf')
+ 
         
         # For images you need to feed it single words not phrases or it will not work
         # invert the image and dilate it, merges the letters a bit then use contours to find each word separately
@@ -261,6 +264,7 @@ class Redactor:
                                     draw.polygon([(loc[0],loc[1]),(loc[2],loc[3]),(loc[4],loc[5]),(loc[6],loc[7])] ,fill=(0,0,0))
                 save_loc = 'redactedpoly.' + extension
                 im.save(save_loc)
+                return(save_loc)
 
         # For powerpoints 
         elif extension == "pptx":
@@ -275,11 +279,12 @@ class Redactor:
                                     paragraph = self.powerpoint_rewrite(paragraph, phrase)
 
             presentation.save('redacted-powerpoint.pptx')
+            return('redacted-powerpoint.pptx')
 
         # For plain text files
         elif extension == "txt":
             with open(self.path, "r") as txt_file:
-                new_file = open('../', mode ='w')
+                new_file = open('redacted.txt', mode ='w')
                 for line in txt_file.readlines():
                     for phrase in redacted_lines:
                         if phrase in line:
@@ -287,6 +292,7 @@ class Redactor:
                             new_text = re.sub(r'\b%s\b' % re.escape(phrase), dash_word, line, flags=re.IGNORECASE)
                             new_file.write(new_text)
                 new_file.close()
+                return('redacted.txt')
 
         # for csv files 
         elif extension == "csv":
@@ -303,6 +309,7 @@ class Redactor:
             with open('redacted-csv.csv', 'w') as writeFile:
                 writer = csv.writer(writeFile)
                 writer.writerow(lines)
+            return ('redacted-csv.csv')
 
         # For xls files
         elif extension == "xlsx":
@@ -319,6 +326,7 @@ class Redactor:
                                 cell.fill = PatternFill(bgColor="000000", fill_type = "solid")
                                 cell.font = Font(color = '000000')
             workbook.save('redacted.xlsx')
+            return('redacted.xlsx')
                         
 
         # For xml files - need to use defusedxml to avoid a bomb
@@ -330,3 +338,4 @@ class Redactor:
                         dash_word = "#"*len(phrase)
                         elem.text = re.sub(r'\b%s\b' % re.escape(phrase), dash_word, elem.text, flags=re.IGNORECASE)
             tree.write('redacted.xml')
+            return('redacted.xml')

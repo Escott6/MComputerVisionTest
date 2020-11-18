@@ -1,0 +1,69 @@
+{% load static %}
+
+<html lang="en">
+<head>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous"><title>File Redaction</title>
+</head>
+<style>
+section-title {
+    font-size: 50px;
+    margin: 0;
+    line-height: 1.2;
+    letter-spacing: -2px;
+}
+
+align-items-center {
+    align-items: center !important;
+}
+
+row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-right: -15px;
+    margin-left: -15px;
+}
+</style>
+
+<body>
+
+<h1>File Redaction Service</h1>
+<br/>
+<section>
+  <div class="container">
+    <div class="col text-center">
+        <div class="text-center mb-40">
+          <div class = "text-center">
+            <h2>We support the following file formats</h2>
+            <p>
+              docx, pdf, jpg, png, jpeg, pptx, txt, csv, xlsx, and xml 
+            </p>
+            <br/>
+          </div>
+      </div>
+    </div>
+  </div>
+</section>
+<div class='row'>
+	<div class='col'>
+		<h1>Add a file here</h1>
+      <form id="searchForm" method="get" action="" class="form-group">
+        <input type="text" name="search_res" value="fileredaction/static/fileredaction/sample." class="form-control" />
+        <br/>
+        <button type="submit" class="btn btn-primary mr-2">
+          <span class="spinner-border spinner-border-sm mr-1"></span>
+          Submit
+        </button>
+      </form>
+      
+      <br/>
+      <h1>View the new File</h1>
+      {% if results %}
+        {{ results }}
+        <br/>
+      {% endif %}
+
+	</div>
+</div>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+</body>
+</html>
