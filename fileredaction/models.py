@@ -21,6 +21,7 @@ from azure.cognitiveservices.vision.computervision.models import VisualFeatureTy
 from msrest.authentication import CognitiveServicesCredentials
 from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
+from docx.enum.shape import WD_INLINE_SHAPE
 from docx.oxml.shared import OxmlElement
 from docx.text.run import Run
 import docx.dml.color
@@ -251,9 +252,11 @@ class Redactor:
                                 draw.polygon([(loc[0],loc[1]),(loc[2],loc[3]),(loc[4],loc[5]),(loc[6],loc[7])] ,fill=(0,0,0))
         return im
 
+    # Redacts document based on file extension 
     def redaction(self): 
         redacted_lines = ["powerpoint","ipsum", "phrases to redact", "over", "test phrase2", "jumps", "Yukon", "lazy", "computer", "canada", "website"]
         extension = self.path.split(".")[-1]
+        
         # For docx
         if extension == "docx":
             doc = Document(self.path)
@@ -270,7 +273,22 @@ class Redactor:
                             for phrase in redacted_lines:
                                 if phrase.casefold() in paragraph.text.casefold():
                                     paragraph = self.paragraph_rewrite(paragraph, phrase)
-
+            # redacts images from docx files if needed
+            for shape in doc.inline_shapes:
+                if shape.type == WD_INLINE_SHAPE.PICTURE:
+                    blip = shape._inline.graphic.graphicData.pic.blipFill.blip # gets <a:blip> element
+                    r_id = blip.embed
+                    document_part = doc.part
+                    image_part = document_part.related_parts[r_id]
+                    ext_image = Image.open(BytesIO(image_part))
+                    if min(ext_image.size) > 50:
+                        new_img = self.local_img_overwrite(ext_image, redacted_lines)
+                        bin_img = BytesIO()
+                        new_img.save(bin_img, format='PNG')
+                        image_data = bin_img.getvalue()
+                        bin_img.close()
+                        image_part._blob = image_data
+            
             doc.save('./redacted.docx')
             return('redacted.docx')
 
@@ -295,7 +313,6 @@ class Redactor:
 
                 # applying the redaction 
                 page.apply_redactions()
-                
                 # Now cycle through the pages images (list of lists)
                 # The same image could be referenced multiple times so will want to filter this
                 for image in page.getImageList(full=True):
@@ -319,7 +336,6 @@ class Redactor:
             # saving it to a new pdf 
             doc.save('redacted22.pdf', garbage=3, deflate = True)
             return('redacted22.pdf')
- 
         
         # For images you need to feed it single words not phrases or it will not work
         # invert the image and dilate it, merges the letters a bit then use contours to find each word separately
