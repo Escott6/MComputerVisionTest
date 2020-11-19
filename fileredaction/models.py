@@ -11,7 +11,9 @@ from PIL import Image, ImageDraw
 from io import BytesIO
 import requests
 from django.conf import settings
-import time 
+import time
+
+from requests.api import head 
 
 from azure.cognitiveservices.vision.computervision import ComputerVisionClient
 from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
@@ -180,26 +182,68 @@ class Redactor:
 
     def img_overwrite(self, im, redacted_lines):
         # img
-        computervision_client = ComputerVisionClient(M_VISION_ENDPOINT, CognitiveServicesCredentials(M_VISION_KEY))
-        recognize_handw_results = computervision_client.read(self.path, raw=True)
-        # Get the operation location (URL with an ID at the end) from the response
-        operation_location_remote = recognize_handw_results.headers["Operation-Location"]
-        # Grab the ID from the URL
-        operation_id = operation_location_remote.split("/")[-1]
-        
-        while True:
-            get_handw_text_results = computervision_client.get_read_result(operation_id)
-            if get_handw_text_results.status not in ['notStarted', 'running']:
-                break
+        ocr_url = M_VISION_ENDPOINT + "vision/v3.1/read/analyze"
+        img_url = self.path
+        headers = {'Ocp-Apim-Subscription-Key': M_VISION_KEY }
+        data = {'url' :img_url}
+
+        response = requests.post(ocr_url, headers=headers, json = data)
+        response.raise_for_status() # checks for invalid request 
+        # Need 2 API calls one for processing, one for retrieving 
+        operation_url = response.headers["Operation-Location"]
+        analysis = {}
+        poll = True
+        while(poll):
+            response_final = requests.get(response.headers["Operation-Location"], headers=headers)
+            analysis = response_final.json()
             time.sleep(1)
-        # Print the detected text, line by line
-        if get_handw_text_results.status == OperationStatusCodes.succeeded:
-            for text_result in get_handw_text_results.analyze_result.read_results:
-                for line in text_result.lines:
-                    for word in line.words:
+            if ("analyzeResult" in analysis):
+                poll = False
+            if("status" in analysis and analysis['status'] == 'failed'):
+                poll = False
+
+        if analysis['status'] != 'failed':
+            for text_result in analysis['analyzeResult']['readResults']:
+                for line in text_result['lines']:
+                    for word in line['words']:
                         for phrase in redacted_lines:
-                            if phrase == word.text:
-                                loc = word.bounding_box
+                            if phrase.casefold() == word['text'].casefold():
+                                loc = word['boundingBox']
+                                # 
+                                draw = ImageDraw.Draw(im)
+                                # [x0,y0,x1,y1] or [(x0,y0), (x1,y1)] format
+                                #draw.rectangle([(loc[0], loc[1]), (loc[4], loc[5])], fill=(0,0,0))
+                                draw.polygon([(loc[0],loc[1]),(loc[2],loc[3]),(loc[4],loc[5]),(loc[6],loc[7])] ,fill=(0,0,0))
+        return im
+
+    def local_img_overwrite(self, im, redacted_lines):
+        bin_img = BytesIO()
+        im.save(bin_img, format='PNG')
+        #im.close()
+        image_data = bin_img.getvalue()
+        bin_img.close()
+        ocr_url = M_VISION_ENDPOINT + "vision/v3.1/read/analyze"
+        headers = {'Ocp-Apim-Subscription-Key': M_VISION_KEY, 'Content-Type': 'application/octet-stream'}
+        response = requests.post(ocr_url, headers=headers, data=image_data)
+        response.raise_for_status() # checks for invalid request 
+        analysis = {}
+        poll = True
+        while(poll):
+            response_final = requests.get(response.headers["Operation-Location"], headers=headers)
+            analysis = response_final.json()
+            time.sleep(1)
+            if ("analyzeResult" in analysis):
+                poll = False
+            if("status" in analysis and analysis['status'] == 'failed'):
+                poll = False
+
+        if analysis['status'] != 'failed':
+            for text_result in analysis['analyzeResult']['readResults']:
+                for line in text_result['lines']:
+                    for word in line['words']:
+                        for phrase in redacted_lines:
+                            if phrase.casefold() == word['text'].casefold():
+                                loc = word['boundingBox']
                                 # 
                                 draw = ImageDraw.Draw(im)
                                 # [x0,y0,x1,y1] or [(x0,y0), (x1,y1)] format
@@ -258,21 +302,23 @@ class Redactor:
                     # First turn the old image into a redacted version of itself
                     xref = image[0] # image contains [0] = xref, [1]=smask, [2]=width, [3]=height,...
                     ext_img = doc.extractImage(xref)
-                    image = Image.open(BytesIO(ext_img['image']))                    
-                    new_img=  self.img_overwrite(image, redacted_lines)
-
-
-                    # Path #2
-                    #img_rect = page.getImageBbox(image)
-                    #rect = fitz.Rect()
-
-                    
-                    #image = fitz.Pixmap(doc,xref)
-                    # page.insertImage(rect, steam = img)
+                    ext_image = Image.open(BytesIO(ext_img['image']))
+                    if min(ext_image.size) > 50:    # Image needs to be at least this big to run through ocr
+                        new_img = self.local_img_overwrite(ext_image, redacted_lines) # corrects returns redacted version of image
+                        # Now set remove the old image and insert the new one
+                        img_rect = page.getImageBbox(image[7])
+                        page.addRedactAnnot(img_rect)
+                        page.apply_redactions()
+                        # Get new image into an insertable format
+                        bin_img = BytesIO()
+                        new_img.save(bin_img, format='PNG')
+                        image_data = bin_img.getvalue()
+                        bin_img.close()
+                        page.insertImage(img_rect, stream=image_data)  
 
             # saving it to a new pdf 
-            doc.save('redacted17.pdf')
-            return('redacted17.pdf')
+            doc.save('redacted22.pdf', garbage=3, deflate = True)
+            return('redacted22.pdf')
  
         
         # For images you need to feed it single words not phrases or it will not work
