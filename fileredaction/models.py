@@ -177,7 +177,35 @@ class Redactor:
                 new_run.text = run.text
                 new_run = self.add_run_styles(new_run, curr_runs[i], True)
         return new_paragraph
-                
+
+    def img_overwrite(self, im, redacted_lines):
+        # img
+        computervision_client = ComputerVisionClient(M_VISION_ENDPOINT, CognitiveServicesCredentials(M_VISION_KEY))
+        recognize_handw_results = computervision_client.read(self.path, raw=True)
+        # Get the operation location (URL with an ID at the end) from the response
+        operation_location_remote = recognize_handw_results.headers["Operation-Location"]
+        # Grab the ID from the URL
+        operation_id = operation_location_remote.split("/")[-1]
+        
+        while True:
+            get_handw_text_results = computervision_client.get_read_result(operation_id)
+            if get_handw_text_results.status not in ['notStarted', 'running']:
+                break
+            time.sleep(1)
+        # Print the detected text, line by line
+        if get_handw_text_results.status == OperationStatusCodes.succeeded:
+            for text_result in get_handw_text_results.analyze_result.read_results:
+                for line in text_result.lines:
+                    for word in line.words:
+                        for phrase in redacted_lines:
+                            if phrase == word.text:
+                                loc = word.bounding_box
+                                # 
+                                draw = ImageDraw.Draw(im)
+                                # [x0,y0,x1,y1] or [(x0,y0), (x1,y1)] format
+                                #draw.rectangle([(loc[0], loc[1]), (loc[4], loc[5])], fill=(0,0,0))
+                                draw.polygon([(loc[0],loc[1]),(loc[2],loc[3]),(loc[4],loc[5]),(loc[6],loc[7])] ,fill=(0,0,0))
+        return im
 
     def redaction(self): 
         redacted_lines = ["powerpoint","ipsum", "phrases to redact", "over", "test phrase2", "jumps", "Yukon", "lazy", "computer", "canada", "website"]
@@ -222,7 +250,25 @@ class Redactor:
                         anot.update()
 
                 # applying the redaction 
-                page.apply_redactions() 
+                page.apply_redactions()
+                
+                # Now cycle through the pages images (list of lists)
+                # The same image could be referenced multiple times so will want to filter this
+                for image in page.getImageList(full=True):
+                    # First turn the old image into a redacted version of itself
+                    xref = image[0] # image contains [0] = xref, [1]=smask, [2]=width, [3]=height,...
+                    ext_img = doc.extractImage(xref)
+                    image = Image.open(BytesIO(ext_img['image']))                    
+                    new_img=  self.img_overwrite(image, redacted_lines)
+
+
+                    # Path #2
+                    #img_rect = page.getImageBbox(image)
+                    #rect = fitz.Rect()
+
+                    
+                    #image = fitz.Pixmap(doc,xref)
+                    # page.insertImage(rect, steam = img)
 
             # saving it to a new pdf 
             doc.save('redacted17.pdf')
@@ -232,39 +278,12 @@ class Redactor:
         # For images you need to feed it single words not phrases or it will not work
         # invert the image and dilate it, merges the letters a bit then use contours to find each word separately
         elif extension == "jpg" or extension == "png" or extension == "jpeg":
-
-            computervision_client = ComputerVisionClient(M_VISION_ENDPOINT, CognitiveServicesCredentials(M_VISION_KEY))
-            recognize_handw_results = computervision_client.read(self.path,  raw=True)
-
-            # Get the operation location (URL with an ID at the end) from the response
-            operation_location_remote = recognize_handw_results.headers["Operation-Location"]
-            # Grab the ID from the URL
-            operation_id = operation_location_remote.split("/")[-1]
             response = requests.get(self.path)
             im = Image.open(BytesIO(response.content))
-
-            while True:
-                get_handw_text_results = computervision_client.get_read_result(operation_id)
-                if get_handw_text_results.status not in ['notStarted', 'running']:
-                    break
-                time.sleep(1)
-
-            # Print the detected text, line by line
-            if get_handw_text_results.status == OperationStatusCodes.succeeded:
-                for text_result in get_handw_text_results.analyze_result.read_results:
-                    for line in text_result.lines:
-                        for word in line.words:
-                            for phrase in redacted_lines:
-                                if phrase == word.text:
-                                    loc = word.bounding_box
-                                    # 
-                                    draw = ImageDraw.Draw(im)
-                                    # [x0,y0,x1,y1] or [(x0,y0), (x1,y1)] format
-                                    #draw.rectangle([(loc[0], loc[1]), (loc[4], loc[5])], fill=(0,0,0))
-                                    draw.polygon([(loc[0],loc[1]),(loc[2],loc[3]),(loc[4],loc[5]),(loc[6],loc[7])] ,fill=(0,0,0))
-                save_loc = 'redactedpoly.' + extension
-                im.save(save_loc)
-                return(save_loc)
+            im = self.img_overwrite(im, redacted_lines)
+            save_loc = 'redactedpoly.' + extension
+            im.save(save_loc)
+            return(save_loc)
 
         # For powerpoints 
         elif extension == "pptx":
