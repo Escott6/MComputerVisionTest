@@ -3,7 +3,7 @@ __author__ = "Evan Scott"
 __email__  = "escott1367@gmail.com"
 __status__ = "Prototype"
 
-from os import write
+import os 
 import fitz 
 import re
 import copy
@@ -12,6 +12,7 @@ from io import BytesIO
 import requests
 from django.conf import settings
 import time
+import zipfile
 
 from requests.api import head 
 
@@ -22,6 +23,7 @@ from msrest.authentication import CognitiveServicesCredentials
 from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
 from docx.enum.shape import WD_INLINE_SHAPE
+from pptx.enum.dml import MSO_PATTERN
 from docx.oxml.shared import OxmlElement
 from docx.text.run import Run
 import docx.dml.color
@@ -126,7 +128,6 @@ class Redactor:
                     new_run = self.add_run_styles(new_run, curr_runs[i], False)
             else:
                 #Append the run as there is nothing to change
-                #TODO cannot recognize the highlight color of the doc might need to go into lxml
                 new_run = new_paragraph.add_run(curr_runs[i].text)
                 new_run = self.add_run_styles(new_run, curr_runs[i], False)
         return new_paragraph
@@ -158,14 +159,17 @@ class Redactor:
                         new_run = new_paragraph.add_run()
                         new_run.text = dash_word
                         new_run = self.add_run_styles(new_run, curr_runs[i], True)
-                        
-                        color_format = ColorFormat(RGBColor(0,0,0),RGBColor(0,0,0))
-                        print(str(color_format.__dict__))
-                        new_run.font.fill.rgb = RGBColor(0,0,0)
-                        new_run.font.fill._xPr = RGBColor(0,0,0)
-                        new_run.font.fill._fill = RGBColor(0,0,0)
-                        new_run.font.fill._fore_color = color_format
-                        new_run.font.fill._back_color = color_format
+            
+                        fill = new_run.font.fill
+                        fill.solid()
+                        fill.patterned()
+                        fill.pattern = MSO_PATTERN.HORIZONTAL_BRICK
+                        fill.fore_color.rgb = RGBColor(0,0,0)
+                        fill.back_color.rgb = RGBColor(0,0,0)
+                        fill._fill = RGBColor(0,0,0)
+                        fill._xPr = RGBColor(0,0,0)
+                        fill.rgb = RGBColor(0,0,0)
+                        #new_run.font.theme_color = MSO_THEME_COLOR.
                     # else just add the word to the existing text
                     else:
                         text_string += word
@@ -175,7 +179,6 @@ class Redactor:
                     new_run = self.add_run_styles(new_run, curr_runs[i], True)
             else:
                 #Append the run as there is nothing to change
-                #TODO cannot recognize the highlight color of the doc might need to go into lxml
                 new_run = new_paragraph.add_run()
                 new_run.text = run.text
                 new_run = self.add_run_styles(new_run, curr_runs[i], True)
@@ -191,7 +194,6 @@ class Redactor:
         response = requests.post(ocr_url, headers=headers, json = data)
         response.raise_for_status() # checks for invalid request 
         # Need 2 API calls one for processing, one for retrieving 
-        operation_url = response.headers["Operation-Location"]
         analysis = {}
         poll = True
         while(poll):
@@ -213,13 +215,13 @@ class Redactor:
                                 # 
                                 draw = ImageDraw.Draw(im)
                                 # [x0,y0,x1,y1] or [(x0,y0), (x1,y1)] format
-                                #draw.rectangle([(loc[0], loc[1]), (loc[4], loc[5])], fill=(0,0,0))
-                                draw.polygon([(loc[0],loc[1]),(loc[2],loc[3]),(loc[4],loc[5]),(loc[6],loc[7])] ,fill=(0,0,0))
+                                draw.rectangle([(loc[0], loc[1]), (loc[4], loc[5])], fill=(0,0,0))
+                                #draw.polygon([(loc[0],loc[1]),(loc[2],loc[3]),(loc[4],loc[5]),(loc[6],loc[7])] ,fill=(0,0,0))
         return im
 
-    def local_img_overwrite(self, im, redacted_lines):
+    def local_img_overwrite(self, im, redacted_lines, ext):
         bin_img = BytesIO()
-        im.save(bin_img, format='PNG')
+        im.save(bin_img, format=ext)
         #im.close()
         image_data = bin_img.getvalue()
         bin_img.close()
@@ -248,11 +250,11 @@ class Redactor:
                                 # 
                                 draw = ImageDraw.Draw(im)
                                 # [x0,y0,x1,y1] or [(x0,y0), (x1,y1)] format
-                                #draw.rectangle([(loc[0], loc[1]), (loc[4], loc[5])], fill=(0,0,0))
-                                draw.polygon([(loc[0],loc[1]),(loc[2],loc[3]),(loc[4],loc[5]),(loc[6],loc[7])] ,fill=(0,0,0))
+                                draw.rectangle([(loc[0], loc[1]), (loc[4], loc[5])], fill=(0,0,0))
+                                #draw.polygon([(loc[0],loc[1]),(loc[2],loc[3]),(loc[4],loc[5]),(loc[6],loc[7])] ,fill=(0,0,0))
         return im
 
-    # Redacts document based on file extension 
+    # Redacts document based on file extension *could also split by distinctive header
     def redaction(self): 
         redacted_lines = ["powerpoint","ipsum", "phrases to redact", "over", "test phrase2", "jumps", "Yukon", "lazy", "computer", "canada", "website"]
         extension = self.path.split(".")[-1]
@@ -260,6 +262,12 @@ class Redactor:
         # For docx
         if extension == "docx":
             doc = Document(self.path)
+            """
+            rels = {}
+            for r in doc.part.rels.values():
+                if isinstance(r._target, docx.parts.image.ImagePart):
+                    rels[r.rId] = os.path.basename(r._target.partname)
+            """
             # Clear one paragraph at a time 
             for paragraph in doc.paragraphs:
                 for phrase in redacted_lines:
@@ -273,23 +281,37 @@ class Redactor:
                             for phrase in redacted_lines:
                                 if phrase.casefold() in paragraph.text.casefold():
                                     paragraph = self.paragraph_rewrite(paragraph, phrase)
+                                    
             # redacts images from docx files if needed
-            for shape in doc.inline_shapes:
-                if shape.type == WD_INLINE_SHAPE.PICTURE:
-                    blip = shape._inline.graphic.graphicData.pic.blipFill.blip # gets <a:blip> element
-                    r_id = blip.embed
-                    document_part = doc.part
-                    image_part = document_part.related_parts[r_id]
-                    ext_image = Image.open(BytesIO(image_part))
-                    if min(ext_image.size) > 50:
-                        new_img = self.local_img_overwrite(ext_image, redacted_lines)
-                        bin_img = BytesIO()
-                        new_img.save(bin_img, format='PNG')
-                        image_data = bin_img.getvalue()
-                        bin_img.close()
-                        image_part._blob = image_data
-            
+            # Pillow cannot edit wmf files can do Image.open("xxx.wmf").save("xxx.png")
+            """
+            for r_id in rels:
+                document_part = doc.part
+                image_part = document_part.related_parts[r_id]
+                # Not finding the distinctive header 
+                #img = image_part.image()
+                ext_image = Image.open(image_part._blob)
+                if min(ext_image.size) > 50:
+                    new_img = self.local_img_overwrite(ext_image, redacted_lines)
+                    bin_img = BytesIO()
+                    new_img.save(bin_img, format='PNG')
+                    image_data = bin_img.getvalue()
+                    bin_img.close()
+                    image_part._blob = image_data
+            """
             doc.save('./redacted.docx')
+            z = zipfile.ZipFile('./redacted.docx')
+            
+            all_files = z.namelist()
+            images = list(filter(lambda x :x.startswith('word/media/'), all_files))
+            for image in images:
+                img = z.open(image).read() # gets the bytes but is a wmf format
+                bin_img = BytesIO()
+                #im = Image.open(image)
+                #im.save(bin_img, format='png')
+                image_data = bin_img.getvalue()
+                bin_img.close()
+
             return('redacted.docx')
 
         # For pdfs
@@ -321,7 +343,7 @@ class Redactor:
                     ext_img = doc.extractImage(xref)
                     ext_image = Image.open(BytesIO(ext_img['image']))
                     if min(ext_image.size) > 50:    # Image needs to be at least this big to run through ocr
-                        new_img = self.local_img_overwrite(ext_image, redacted_lines) # corrects returns redacted version of image
+                        new_img = self.local_img_overwrite(ext_image, redacted_lines, ext_img['ext']) # corrects returns redacted version of image
                         # Now set remove the old image and insert the new one
                         img_rect = page.getImageBbox(image[7])
                         page.addRedactAnnot(img_rect)
@@ -359,8 +381,8 @@ class Redactor:
                                 if paragraph is not None  and phrase.casefold() in paragraph.text.casefold():
                                     paragraph = self.powerpoint_rewrite(paragraph, phrase)
 
-            presentation.save('redacted-powerpoint.pptx')
-            return('redacted-powerpoint.pptx')
+            presentation.save('redacted.pptx')
+            return('redacted.pptx')
 
         # For plain text files
         elif extension == "txt":
